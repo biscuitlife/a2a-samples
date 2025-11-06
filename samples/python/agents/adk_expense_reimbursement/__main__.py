@@ -28,8 +28,10 @@ class MissingAPIKeyError(Exception):
 @click.option('--port', default=10002)
 def main(host, port):
     try:
-        # Check for API key only if Vertex AI is not configured
-        if not os.getenv('GOOGLE_GENAI_USE_VERTEXAI') == 'TRUE':
+        # Ollama doesn't need API key, skip the check
+        # Check for API key only if Vertex AI is not configured and not using Ollama
+        using_ollama = os.getenv('OLLAMA_MODEL') or 'ollama/' in os.getenv('LITELLM_MODEL', '')
+        if not using_ollama and not os.getenv('GOOGLE_GENAI_USE_VERTEXAI') == 'TRUE':
             if not os.getenv('GEMINI_API_KEY'):
                 raise MissingAPIKeyError(
                     'GEMINI_API_KEY environment variable not set and GOOGLE_GENAI_USE_VERTEXAI is not TRUE.'

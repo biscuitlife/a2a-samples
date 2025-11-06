@@ -39,18 +39,26 @@ def on_load(e: me.LoadEvent):  # pylint: disable=unused-argument
         state.current_conversation_id = ''
 
     # check if the API key is set in the environment
-    # and if the user is using Vertex AI
+    # and if the user is using Vertex AI or Ollama
     uses_vertex_ai = (
         os.getenv('GOOGLE_GENAI_USE_VERTEXAI', '').upper() == 'TRUE'
+    )
+    uses_ollama = (
+        os.getenv('OLLAMA_MODEL') is not None or 
+        'ollama/' in os.getenv('LITELLM_MODEL', '')
     )
     api_key = os.getenv('GOOGLE_API_KEY', '')
 
     if uses_vertex_ai:
         state.uses_vertex_ai = True
+    elif uses_ollama:
+        # Ollama doesn't need API key
+        state.uses_vertex_ai = False
+        state.api_key = 'ollama-local'  # Dummy value to bypass check
     elif api_key:
         state.api_key = api_key
     else:
-        # Show the API key dialog if both are not set
+        # Show the API key dialog if none are configured
         state.api_key_dialog_open = True
 
 

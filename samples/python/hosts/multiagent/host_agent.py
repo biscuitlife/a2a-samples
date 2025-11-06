@@ -89,11 +89,16 @@ class HostAgent:
         self.agents = '\n'.join(agent_info)
 
     def create_agent(self) -> Agent:
-        LITELLM_MODEL = os.getenv(
-            'LITELLM_MODEL', 'gemini/gemini-2.0-flash-001'
+        # Use Vertex AI (no geo restrictions, enterprise-grade)
+        # Gemini 2.0 Flash has excellent function calling support
+        model_name = os.getenv(
+            'LITELLM_MODEL', 'vertex_ai/gemini-2.0-flash-exp'
         )
         return Agent(
-            model=LiteLlm(model=LITELLM_MODEL),
+            model=LiteLlm(
+                model=model_name,
+                supports_function_calling=True,
+            ),
             name='host_agent',
             instruction=self.root_instruction,
             before_model_callback=self.before_model_callback,

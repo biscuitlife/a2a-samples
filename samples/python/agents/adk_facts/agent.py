@@ -7,9 +7,9 @@ from google.adk.tools import google_search
 
 root_agent = Agent(
     name='facts_agent',
-    model='gemini-2.5-flash-lite',
-    description=('Agent to give interesting facts.'),
-    instruction=('You are a helpful agent who can provide interesting facts.'),
+    model='gemini-2.0-flash-exp',  # 使用 Vertex AI 上的 Gemini 2.0
+    description=('Agent to give interesting facts about various topics.'),
+    instruction=('You are a helpful agent who can provide interesting and educational facts about any topic. Use web search when needed to find accurate information.'),
     tools=[google_search],
 )
 

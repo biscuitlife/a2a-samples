@@ -134,9 +134,12 @@ class ReimbursementAgent:
 
     def _build_agent(self) -> LlmAgent:
         """Builds the LLM agent for the reimbursement agent."""
-        LITELLM_MODEL = os.getenv('LITELLM_MODEL', 'gemini/gemini-2.0-flash-001')
+        # Use Vertex AI (no geo restrictions, excellent function calling)
+        model_name = os.getenv(
+            'LITELLM_MODEL', 'vertex_ai/gemini-2.0-flash-exp'
+        )
         return LlmAgent(
-            model=LiteLlm(model=LITELLM_MODEL),
+            model=LiteLlm(model=model_name),
             name='reimbursement_agent',
             description=(
                 'This agent handles the reimbursement process for the employees'
