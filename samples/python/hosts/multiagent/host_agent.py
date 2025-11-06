@@ -183,6 +183,14 @@ Current agent: {current_agent['active_agent']}
         if agent_name not in self.remote_agent_connections:
             raise ValueError(f'Agent {agent_name} not found')
         state = tool_context.state
+        
+        # Check if we're switching to a different agent
+        previous_agent = state.get('agent', None)
+        if previous_agent and previous_agent != agent_name:
+            # Switching to a different agent, clear the previous task_id
+            # Each agent should have its own task context
+            state['task_id'] = None
+            
         state['agent'] = agent_name
         client = self.remote_agent_connections[agent_name]
         if not client:
