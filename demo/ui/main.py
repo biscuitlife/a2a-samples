@@ -26,7 +26,13 @@ from state import host_agent_service
 from state.state import AppState
 
 
+# Load environment variables FIRST
 load_dotenv()
+
+# Debug: Print environment variables
+print("[DEBUG] GOOGLE_GENAI_USE_VERTEXAI:", os.getenv('GOOGLE_GENAI_USE_VERTEXAI'))
+print("[DEBUG] GOOGLE_CLOUD_PROJECT:", os.getenv('GOOGLE_CLOUD_PROJECT'))
+print("[DEBUG] LITELLM_MODEL:", os.getenv('LITELLM_MODEL'))
 
 
 def on_load(e: me.LoadEvent):  # pylint: disable=unused-argument

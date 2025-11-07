@@ -1,9 +1,12 @@
 import os
 
+from dotenv import load_dotenv
 from google.adk import Agent
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 from google.adk.tools import google_search
 
+# Load environment variables
+load_dotenv()
 
 root_agent = Agent(
     name='facts_agent',

@@ -89,8 +89,13 @@ class HostAgent:
         self.agents = '\n'.join(agent_info)
 
     def create_agent(self) -> Agent:
-        # Use Vertex AI (no geo restrictions, enterprise-grade)
-        # Gemini 2.0 Flash has excellent function calling support
+        # Use Vertex AI via LiteLLM (with proper configuration)
+        # Set environment to suppress warnings
+        os.environ['ADK_SUPPRESS_GEMINI_LITELLM_WARNINGS'] = 'true'
+        
+        # Set LiteLLM timeout environment variable (in seconds)
+        os.environ['LITELLM_REQUEST_TIMEOUT'] = '120'
+        
         model_name = os.getenv(
             'LITELLM_MODEL', 'vertex_ai/gemini-2.0-flash-exp'
         )

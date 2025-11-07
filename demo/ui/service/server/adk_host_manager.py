@@ -158,65 +158,106 @@ class ADKHostManager(ApplicationManager):
                 timestamp=datetime.datetime.utcnow().timestamp(),
             )
         )
-        final_event = None
-        # Determine if a task is to be resumed.
-        session = await self._session_service.get_session(
-            app_name='A2A', user_id='test_user', session_id=context_id
-        )
-        task_id = message.task_id
-        # Update state must happen in an event
-        state_update = {
-            'task_id': task_id,
-            'context_id': context_id,
-            'message_id': message.message_id,
-        }
-        # Need to upsert session state now, only way is to append an event.
-        await self._session_service.append_event(
-            session,
-            ADKEvent(
-                id=ADKEvent.new_id(),
-                author='host_agent',
-                invocation_id=ADKEvent.new_id(),
-                actions=ADKEventActions(state_delta=state_update),
-            ),
-        )
-        async for event in self._host_runner.run_async(
-            user_id=self.user_id,
-            session_id=context_id,
-            new_message=self.adk_content_from_message(message),
-        ):
-            if (
-                event.actions.state_delta
-                and 'task_id' in event.actions.state_delta
-            ):
-                task_id = event.actions.state_delta['task_id']
-            self.add_event(
-                Event(
-                    id=event.id,
-                    actor=event.author,
-                    content=await self.adk_content_to_message(
-                        event.content, context_id, task_id
-                    ),
-                    timestamp=event.timestamp,
+        
+        try:
+            final_event = None
+            # Determine if a task is to be resumed.
+            session = await self._session_service.get_session(
+                app_name='A2A', user_id='test_user', session_id=context_id
+            )
+            task_id = message.task_id
+            # Update state must happen in an event
+            state_update = {
+                'task_id': task_id,
+                'context_id': context_id,
+                'message_id': message.message_id,
+            }
+            # Need to upsert session state now, only way is to append an event.
+            await self._session_service.append_event(
+                session,
+                ADKEvent(
+                    id=ADKEvent.new_id(),
+                    author='host_agent',
+                    invocation_id=ADKEvent.new_id(),
+                    actions=ADKEventActions(state_delta=state_update),
+                ),
+            )
+            
+            # Run with timeout (120 seconds)
+            async def run_with_timeout():
+                nonlocal task_id  # Allow access to outer task_id variable
+                events = []
+                async for event in self._host_runner.run_async(
+                    user_id=self.user_id,
+                    session_id=context_id,
+                    new_message=self.adk_content_from_message(message),
+                ):
+                    if (
+                        event.actions.state_delta
+                        and 'task_id' in event.actions.state_delta
+                    ):
+                        task_id = event.actions.state_delta['task_id']
+                    self.add_event(
+                        Event(
+                            id=event.id,
+                            actor=event.author,
+                            content=await self.adk_content_to_message(
+                                event.content, context_id, task_id
+                            ),
+                            timestamp=event.timestamp,
+                        )
+                    )
+                    events.append(event)
+                return events[-1] if events else None
+            
+            final_event = await asyncio.wait_for(run_with_timeout(), timeout=120.0)
+            
+            response: Message | None = None
+            if final_event:
+                if (
+                    final_event.actions.state_delta
+                    and 'task_id' in final_event.actions.state_delta
+                ):
+                    task_id = final_event.actions.state_delta['task_id']
+                final_event.content.role = 'model'
+                response = await self.adk_content_to_message(
+                    final_event.content, context_id, task_id
                 )
-            )
-            final_event = event
-        response: Message | None = None
-        if final_event:
-            if (
-                final_event.actions.state_delta
-                and 'task_id' in final_event.actions.state_delta
-            ):
-                task_id = event.actions.state_delta['task_id']
-            final_event.content.role = 'model'
-            response = await self.adk_content_to_message(
-                final_event.content, context_id, task_id
-            )
-            self._messages.append(response)
+                self._messages.append(response)
 
-        if conversation and response:
-            conversation.messages.append(response)
-        self._pending_message_ids.remove(message_id)
+            if conversation and response:
+                conversation.messages.append(response)
+                
+        except asyncio.TimeoutError:
+            print(f'[ERROR] Message processing timed out after 120 seconds for message {message_id}')
+            # Create error response
+            error_response = Message(
+                role=Role.agent,
+                parts=[Part(root=TextPart(text='Sorry, the request timed out. Please try again.'))],
+                context_id=context_id,
+                message_id=str(uuid.uuid4()),
+            )
+            self._messages.append(error_response)
+            if conversation:
+                conversation.messages.append(error_response)
+        except Exception as e:
+            print(f'[ERROR] Exception processing message {message_id}: {e}')
+            import traceback
+            traceback.print_exc()
+            # Create error response
+            error_response = Message(
+                role=Role.agent,
+                parts=[Part(root=TextPart(text=f'Sorry, an error occurred: {str(e)}'))],
+                context_id=context_id,
+                message_id=str(uuid.uuid4()),
+            )
+            self._messages.append(error_response)
+            if conversation:
+                conversation.messages.append(error_response)
+        finally:
+            # Always remove from pending list
+            if message_id and message_id in self._pending_message_ids:
+                self._pending_message_ids.remove(message_id)
 
     def add_task(self, task: Task):
         self._tasks.append(task)
